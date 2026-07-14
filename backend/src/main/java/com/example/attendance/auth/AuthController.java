@@ -59,7 +59,7 @@ public class AuthController {
         if (auth == null || !auth.isAuthenticated()) {
             return ResponseEntity.status(401).build();
         }
-        var email = (String) auth.getPrincipal();
+        var email = auth.getName();
         var employee = employeeRepository.findByEmailAndActiveTrue(email)
                 .map(EmployeeResponse::from)
                 .orElse(null);
