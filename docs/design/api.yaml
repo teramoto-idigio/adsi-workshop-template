@@ -1,0 +1,1080 @@
+openapi: 3.0.3
+info:
+  title: 勤怠管理アプリ API
+  version: 1.0.0
+  description: 勤怠記録・有給申請・残業申請を管理するREST API
+
+servers:
+  - url: http://localhost:8080/api
+    description: ローカル開発
+
+tags:
+  - name: auth
+    description: 認証
+  - name: attendance
+    description: 勤怠記録
+  - name: leave
+    description: 有給休暇
+  - name: overtime
+    description: 残業申請
+  - name: employees
+    description: 社員管理
+  - name: departments
+    description: 部署管理
+  - name: export
+    description: CSVエクスポート
+
+paths:
+  # === 認証 ===
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: ログイン
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: ログイン成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 認証失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: ログアウト
+      operationId: logout
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: ログアウト成功
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: ログインユーザー情報取得
+      operationId: getCurrentUser
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeResponse'
+
+  # === 勤怠記録 ===
+  /attendance:
+    get:
+      tags: [attendance]
+      summary: 月次勤怠一覧取得
+      operationId: getMonthlyAttendance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyAttendanceResponse'
+
+  /attendance/{date}:
+    put:
+      tags: [attendance]
+      summary: 勤怠記録の登録・更新
+      operationId: upsertAttendance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecordResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /attendance/summary:
+    get:
+      tags: [attendance]
+      summary: 月次集計取得
+      operationId: getMonthlySummary
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlySummaryResponse'
+
+  # === マネージャー: 部署メンバー勤怠 ===
+  /manager/attendance:
+    get:
+      tags: [attendance]
+      summary: 部署メンバーの月次勤怠サマリー
+      operationId: getDepartmentAttendanceSummary
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmployeeMonthlySummary'
+        '403':
+          description: 権限なし
+
+  /manager/attendance/{employeeId}:
+    get:
+      tags: [attendance]
+      summary: 部署メンバーの日別勤怠詳細
+      operationId: getMemberAttendance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyAttendanceResponse'
+        '403':
+          description: 権限なし（自部署外）
+
+  # === 有給休暇 ===
+  /leave/requests:
+    get:
+      tags: [leave]
+      summary: 自分の有給申請一覧
+      operationId: getMyLeaveRequests
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaveRequestResponse'
+
+    post:
+      tags: [leave]
+      summary: 有給申請
+      operationId: createLeaveRequest
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaveRequestCreate'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveRequestResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /leave/balance:
+    get:
+      tags: [leave]
+      summary: 有給残日数取得
+      operationId: getLeaveBalance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: fiscalYear
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveBalanceResponse'
+
+  # === マネージャー: 有給承認 ===
+  /manager/leave/requests:
+    get:
+      tags: [leave]
+      summary: 部署の未承認有給申請一覧
+      operationId: getPendingLeaveRequests
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaveRequestResponse'
+
+  /manager/leave/requests/{id}/approve:
+    post:
+      tags: [leave]
+      summary: 有給申請を承認
+      operationId: approveLeaveRequest
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveRequestResponse'
+
+  /manager/leave/requests/{id}/reject:
+    post:
+      tags: [leave]
+      summary: 有給申請を却下
+      operationId: rejectLeaveRequest
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectionRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveRequestResponse'
+
+  # === 管理者: 有給付与 ===
+  /admin/leave/balance/{employeeId}:
+    post:
+      tags: [leave]
+      summary: 有給日数を付与
+      operationId: grantLeaveBalance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaveBalanceGrant'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveBalanceResponse'
+
+  # === 残業申請 ===
+  /overtime/requests:
+    get:
+      tags: [overtime]
+      summary: 自分の残業申請一覧
+      operationId: getMyOvertimeRequests
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OvertimeRequestResponse'
+
+    post:
+      tags: [overtime]
+      summary: 残業申請
+      operationId: createOvertimeRequest
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OvertimeRequestCreate'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OvertimeRequestResponse'
+
+  # === マネージャー: 残業承認 ===
+  /manager/overtime/requests:
+    get:
+      tags: [overtime]
+      summary: 部署の未承認残業申請一覧
+      operationId: getPendingOvertimeRequests
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OvertimeRequestResponse'
+
+  /manager/overtime/requests/{id}/approve:
+    post:
+      tags: [overtime]
+      summary: 残業申請を承認
+      operationId: approveOvertimeRequest
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OvertimeRequestResponse'
+
+  /manager/overtime/requests/{id}/reject:
+    post:
+      tags: [overtime]
+      summary: 残業申請を却下
+      operationId: rejectOvertimeRequest
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectionRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OvertimeRequestResponse'
+
+  # === 社員管理（管理者） ===
+  /admin/employees:
+    get:
+      tags: [employees]
+      summary: 社員一覧
+      operationId: getAllEmployees
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: departmentId
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: active
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmployeeResponse'
+
+    post:
+      tags: [employees]
+      summary: 社員登録
+      operationId: createEmployee
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeCreateRequest'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeResponse'
+
+  /admin/employees/{id}:
+    put:
+      tags: [employees]
+      summary: 社員情報更新
+      operationId: updateEmployee
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeUpdateRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeResponse'
+
+  /admin/employees/{id}/deactivate:
+    post:
+      tags: [employees]
+      summary: 社員無効化
+      operationId: deactivateEmployee
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: 無効化完了
+
+  # === 部署管理（管理者） ===
+  /admin/departments:
+    get:
+      tags: [departments]
+      summary: 部署一覧
+      operationId: getAllDepartments
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DepartmentResponse'
+
+    post:
+      tags: [departments]
+      summary: 部署作成
+      operationId: createDepartment
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepartmentRequest'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentResponse'
+
+  /admin/departments/{id}:
+    put:
+      tags: [departments]
+      summary: 部署名更新
+      operationId: updateDepartment
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepartmentRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentResponse'
+
+    delete:
+      tags: [departments]
+      summary: 部署削除（所属社員がいない場合のみ）
+      operationId: deleteDepartment
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: 削除完了
+        '409':
+          description: 所属社員が存在するため削除不可
+
+  # === CSVエクスポート ===
+  /export/attendance:
+    get:
+      tags: [export]
+      summary: 個人月次勤怠CSV
+      operationId: exportMyAttendanceCsv
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: CSVファイル
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+
+  /export/department-summary:
+    get:
+      tags: [export]
+      summary: 部署月次サマリーCSV（マネージャー）
+      operationId: exportDepartmentSummaryCsv
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: CSVファイル
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: 権限なし
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: SESSION
+
+  schemas:
+    # === Auth ===
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    LoginResponse:
+      type: object
+      properties:
+        employee:
+          $ref: '#/components/schemas/EmployeeResponse'
+
+    # === Attendance ===
+    AttendanceRequest:
+      type: object
+      required: [clockIn, breakMinutes]
+      properties:
+        clockIn:
+          type: string
+          format: time
+          example: "09:00"
+        clockOut:
+          type: string
+          format: time
+          example: "18:00"
+          nullable: true
+        breakMinutes:
+          type: integer
+          minimum: 0
+          example: 60
+        note:
+          type: string
+          maxLength: 500
+          nullable: true
+
+    AttendanceRecordResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        date:
+          type: string
+          format: date
+        clockIn:
+          type: string
+          format: time
+        clockOut:
+          type: string
+          format: time
+          nullable: true
+        breakMinutes:
+          type: integer
+        note:
+          type: string
+          nullable: true
+        workMinutes:
+          type: integer
+          description: 勤務時間（分）
+        overtimeMinutes:
+          type: integer
+          description: 残業時間（分）
+        nightMinutes:
+          type: integer
+          description: 深夜勤務時間（分）
+
+    MonthlyAttendanceResponse:
+      type: object
+      properties:
+        year:
+          type: integer
+        month:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttendanceRecordResponse'
+        summary:
+          $ref: '#/components/schemas/MonthlySummaryResponse'
+
+    MonthlySummaryResponse:
+      type: object
+      properties:
+        totalWorkMinutes:
+          type: integer
+        totalOvertimeMinutes:
+          type: integer
+        totalNightMinutes:
+          type: integer
+        prescribedMinutes:
+          type: integer
+          description: 月の所定労働時間（分）
+        balanceMinutes:
+          type: integer
+          description: 過不足（分）
+
+    EmployeeMonthlySummary:
+      type: object
+      properties:
+        employeeId:
+          type: integer
+          format: int64
+        employeeName:
+          type: string
+        totalWorkMinutes:
+          type: integer
+        totalOvertimeMinutes:
+          type: integer
+        totalNightMinutes:
+          type: integer
+        workDays:
+          type: integer
+
+    # === Leave ===
+    LeaveRequestCreate:
+      type: object
+      required: [date, leaveType]
+      properties:
+        date:
+          type: string
+          format: date
+        leaveType:
+          type: string
+          enum: [FULL_DAY, AM_HALF, PM_HALF]
+
+    LeaveRequestResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        employeeId:
+          type: integer
+          format: int64
+        employeeName:
+          type: string
+        date:
+          type: string
+          format: date
+        leaveType:
+          type: string
+          enum: [FULL_DAY, AM_HALF, PM_HALF]
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+        rejectionReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    LeaveBalanceResponse:
+      type: object
+      properties:
+        fiscalYear:
+          type: integer
+        totalDays:
+          type: number
+          format: double
+        usedDays:
+          type: number
+          format: double
+        remainingDays:
+          type: number
+          format: double
+
+    LeaveBalanceGrant:
+      type: object
+      required: [fiscalYear, days]
+      properties:
+        fiscalYear:
+          type: integer
+        days:
+          type: number
+          format: double
+          minimum: 0.5
+
+    # === Overtime ===
+    OvertimeRequestCreate:
+      type: object
+      required: [date, requestType, overtimeMinutes, reason]
+      properties:
+        date:
+          type: string
+          format: date
+        requestType:
+          type: string
+          enum: [PRE_APPROVAL, POST_APPROVAL]
+        overtimeMinutes:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+          maxLength: 500
+
+    OvertimeRequestResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        employeeId:
+          type: integer
+          format: int64
+        employeeName:
+          type: string
+        date:
+          type: string
+          format: date
+        requestType:
+          type: string
+          enum: [PRE_APPROVAL, POST_APPROVAL]
+        overtimeMinutes:
+          type: integer
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+        rejectionReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    RejectionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+
+    # === Employee ===
+    EmployeeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [EMPLOYEE, MANAGER, ADMIN]
+        departmentId:
+          type: integer
+          format: int64
+        departmentName:
+          type: string
+        active:
+          type: boolean
+
+    EmployeeCreateRequest:
+      type: object
+      required: [name, email, password, role, departmentId]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        role:
+          type: string
+          enum: [EMPLOYEE, MANAGER, ADMIN]
+        departmentId:
+          type: integer
+          format: int64
+
+    EmployeeUpdateRequest:
+      type: object
+      required: [name, email, role, departmentId]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [EMPLOYEE, MANAGER, ADMIN]
+        departmentId:
+          type: integer
+          format: int64
+
+    # === Department ===
+    DepartmentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        employeeCount:
+          type: integer
+
+    DepartmentRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+
+    # === Error ===
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
