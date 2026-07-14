@@ -1,0 +1,13 @@
+CREATE TABLE leave_balances (
+    id BIGSERIAL PRIMARY KEY,
+    employee_id BIGINT NOT NULL REFERENCES employees(id),
+    fiscal_year INTEGER NOT NULL,
+    total_days DECIMAL(4,1) NOT NULL,
+    used_days DECIMAL(4,1) NOT NULL DEFAULT 0,
+    version BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE(employee_id, fiscal_year)
+);
+
+CREATE INDEX idx_leave_balances_employee_year ON leave_balances(employee_id, fiscal_year);
