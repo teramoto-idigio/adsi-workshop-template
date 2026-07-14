@@ -18,7 +18,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.push("/");
+      const dir = window.location.pathname.replace(/\/[^/]*$/, "");
+      window.location.href = `${dir}/`;
     } catch (err) {
       setError("メールアドレスまたはパスワードが正しくありません");
     } finally {

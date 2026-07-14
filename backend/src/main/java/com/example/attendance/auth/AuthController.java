@@ -27,8 +27,17 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpSession session) {
+        return doLogin(request.email(), request.password(), session);
+    }
+
+    @GetMapping("/login")
+    public ResponseEntity<?> loginViaGet(@RequestParam String email, @RequestParam String password, HttpSession session) {
+        return doLogin(email, password, session);
+    }
+
+    private ResponseEntity<?> doLogin(String email, String password, HttpSession session) {
         try {
-            var employee = authService.authenticate(request.email(), request.password());
+            var employee = authService.authenticate(email, password);
             var auth = new UsernamePasswordAuthenticationToken(
                     employee.email(),
                     null,

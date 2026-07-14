@@ -11,9 +11,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/login");
+      const dir = window.location.pathname.replace(/\/[^/]*$/, "");
+      window.location.href = `${dir}/login`;
     }
-  }, [loading, user, router]);
+  }, [loading, user]);
 
   if (loading) {
     return (

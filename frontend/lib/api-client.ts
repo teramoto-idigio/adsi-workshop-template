@@ -1,3 +1,9 @@
+function getApiBase(): string {
+  if (typeof window === "undefined") return "/api";
+  const dir = window.location.pathname.replace(/\/[^/]*$/, "");
+  return `${dir}/api`;
+}
+
 export function withBasePath(path: string): string {
   return path;
 }
@@ -6,7 +12,7 @@ export async function apiClient<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
-  const url = `/api${path}`;
+  const url = `${getApiBase()}${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {

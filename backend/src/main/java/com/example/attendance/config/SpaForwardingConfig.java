@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
 
@@ -12,6 +13,11 @@ import java.io.IOException;
 @Configuration
 @Profile("local")
 public class SpaForwardingConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/").setViewName("forward:/index.html");
+    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
@@ -25,7 +31,6 @@ public class SpaForwardingConfig implements WebMvcConfigurer {
                         if (requested.exists() && requested.isReadable()) {
                             return requested;
                         }
-                        // SPA fallback: return the page's HTML if it exists, otherwise index.html
                         Resource pageHtml = location.createRelative(resourcePath + ".html");
                         if (pageHtml.exists() && pageHtml.isReadable()) {
                             return pageHtml;

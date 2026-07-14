@@ -34,10 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await apiClient<{ employee: Employee }>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
+    const params = new URLSearchParams({ email, password });
+    const res = await apiClient<{ employee: Employee }>(`/auth/login?${params}`);
     setUser(res.employee);
   }, []);
 
