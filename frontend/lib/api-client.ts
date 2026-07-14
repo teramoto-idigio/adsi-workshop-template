@@ -1,14 +1,12 @@
-const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
-
 export function withBasePath(path: string): string {
-  return `${BASE_PATH}${path}`;
+  return path;
 }
 
 export async function apiClient<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
-  const url = withBasePath(`/api${path}`);
+  const url = `/api${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {
